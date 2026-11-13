@@ -81,6 +81,15 @@ export const JOB_ATTRS = [
   // Needed to tell 'spooling your input' (16) apart from a real
   // problem. Without it every just-submitted job reads as failed.
   'HoldReasonCode',
+  // A workflow is ONE row (see ownJobsConstraint), so that row has to
+  // say how much of the workflow is done -- otherwise a DAG with forty
+  // nodes reads exactly like a single job that has been "Running" for
+  // an hour. DAGMan publishes these on the manager job and updates
+  // them as it goes; they are absent on every other kind of job.
+  'DAG_NodesTotal',
+  'DAG_NodesDone',
+  'DAG_NodesQueued',
+  'DAG_NodesFailed',
 ] as const satisfies readonly string[];
 
 /** A job as the API returns it: a ClassAd, so the fields are loose. */
@@ -92,6 +101,11 @@ export interface Job {
   Cmd?: string;
   JobBatchName?: string;
   QDate?: number;
+  // DAGMan's own counters, present only on a workflow's manager job.
+  DAG_NodesTotal?: number;
+  DAG_NodesDone?: number;
+  DAG_NodesQueued?: number;
+  DAG_NodesFailed?: number;
   HoldReason?: string;
   HoldReasonCode?: number;
   ExitCode?: number;

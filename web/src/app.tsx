@@ -21,6 +21,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, HoldReasonCode, JobStatus, jobStatusLabel, type Job } from './lib/api';
+import { dagProgress } from './lib/jobs';
 import { PIPELINES, ownJobsConstraint, pipelineById, pipelineForJob } from './pipelines';
 import { emptyFileSet, isPlanError, type FileSet } from './pipelines/types';
 import { app, type Identity } from './lib/htcondor';
@@ -300,6 +301,13 @@ export function App() {
                     {String(j.JobBatchName ?? 'run')} <span className="meta">#{id}</span>
                   </span>
                   <span className="meta">{jobStatusLabel(j)}</span>
+                  {/* A workflow is one row, so the row carries its
+                      progress. Null for an ordinary job. */}
+                  {dagProgress(j) && (
+                    <span className="meta" data-testid={`progress-${id}`}>
+                      {dagProgress(j)}
+                    </span>
+                  )}
                   {finished && source && (
                     <button
                       type="button"
