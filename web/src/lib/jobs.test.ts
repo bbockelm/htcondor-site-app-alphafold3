@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { sortJobs } from './jobs';
-import { api, type Job } from './api';
+import { sortJobs, dagProgress } from './jobs';
+import { api, JOB_ATTRS, type Job } from './api';
 
 /**
  * A queue in a deliberately wrong order.
@@ -90,5 +90,43 @@ describe('api.jobs', () => {
     return api.jobs().then((jobs) => {
       expect(ids(jobs)).toEqual(['9.0', '8.0', '7.0', '7.1', '7.2']);
     });
+  });
+});
+
+describe('what a workflow row says about itself', () => {
+  /** A manager job as DAGMan publishes it. */
+  function dag(counts: Partial<Job>): Job {
+    return { ClusterId: 5, ProcId: 0, JobStatus: 2, QDate: 1000, ...counts };
+  }
+
+  it('counts the finished nodes, because the nodes have no rows of their own', () => {
+    expect(dagProgress(dag({ DAG_NodesTotal: 12, DAG_NodesDone: 3 }))).toBe(
+      '3 of 12 steps done',
+    );
+  });
+
+  it('names failures: a DAG keeps running after one, and still reads "Running"', () => {
+    expect(
+      dagProgress(dag({ DAG_NodesTotal: 12, DAG_NodesDone: 3, DAG_NodesFailed: 1 })),
+    ).toBe('3 of 12 steps done, 1 failed');
+  });
+
+  it('treats a missing count as none done rather than as NaN', () => {
+    // DAGMan publishes these as it goes; the manager job exists before
+    // it has written any of them.
+    expect(dagProgress(dag({ DAG_NodesTotal: 4 }))).toBe('0 of 4 steps done');
+  });
+
+  it('is null for an ordinary job, which is every job that is not a DAG', () => {
+    expect(dagProgress(dag({}))).toBeNull();
+    expect(dagProgress(dag({ DAG_NodesTotal: 0 }))).toBeNull();
+  });
+
+  it('asks for the counters it reads', () => {
+    // A projection that does not name them returns undefined for all
+    // four, which renders as no progress at all rather than failing.
+    for (const a of ['DAG_NodesTotal', 'DAG_NodesDone', 'DAG_NodesFailed']) {
+      expect(JOB_ATTRS as readonly string[]).toContain(a);
+    }
   });
 });

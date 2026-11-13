@@ -44,3 +44,29 @@ export function sortJobs(jobs: Job[]): Job[] {
       queuedAt(b) - queuedAt(a) || b.ClusterId - a.ClusterId || a.ProcId - b.ProcId,
   );
 }
+
+/**
+ * How far a workflow has got, for the one row that represents it.
+ *
+ * "Your runs" lists one row per submission, so a DAG appears as its
+ * manager job and its nodes do not appear at all -- see
+ * ownJobsConstraint. That is the right list, and on its own it is a
+ * row that says "Running" for an hour with nothing to show whether
+ * forty searches are finished or none are. DAGMan already counts, on
+ * the manager job; this reads its counters.
+ *
+ * Returns null for anything that is not a workflow, which is every
+ * job that was submitted straight to the queue.
+ */
+export function dagProgress(job: Job): string | null {
+  const total = job.DAG_NodesTotal;
+  if (typeof total !== 'number' || total <= 0) return null;
+  const done = typeof job.DAG_NodesDone === 'number' ? job.DAG_NodesDone : 0;
+  const failed = typeof job.DAG_NodesFailed === 'number' ? job.DAG_NodesFailed : 0;
+  const steps = `${done} of ${total} ${total === 1 ? 'step' : 'steps'} done`;
+  // Failures are named here rather than left to the results view: a
+  // workflow that keeps running after a node fails is still "Running",
+  // and the count is the only sign on this page that something went
+  // wrong while it did.
+  return failed > 0 ? `${steps}, ${failed} failed` : steps;
+}
