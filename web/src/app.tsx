@@ -25,6 +25,7 @@ import { PIPELINES, ownJobsConstraint, pipelineById, pipelineForJob } from './pi
 import { emptyFileSet, isPlanError, type FileSet } from './pipelines/types';
 import { app, type Identity } from './lib/htcondor';
 import { Dropzone } from './components/Dropzone';
+import { PipelineChooser } from './components/PipelineChooser';
 import { formatSize } from './lib/format';
 
 export function App() {
@@ -109,6 +110,13 @@ export function App() {
       // The pipeline decides what to submit. It may refuse -- a file
       // it cannot use, a name it cannot safely transfer -- and its
       // message is written for the person who dropped the file.
+<<<<<<< HEAD
+=======
+      //
+      // AWAITED: a planner that generates the job's inputs from the
+      // user's data has to read that data, and reading a File is a
+      // promise. A synchronous planner is unaffected.
+>>>>>>> f125d64 (Take the template's field-feedback fixes: form order, one-pipeline picker, phone tables, job order)
       const planned = await pipeline.plan(chosen, options);
       if (isPlanError(planned)) {
         setError(planned.message);
@@ -172,6 +180,18 @@ export function App() {
           Submitted job {submitted}. It will appear below.
         </div>
       )}
+
+      {/* WHAT TO RUN COMES FIRST. Each slot's label, hint and `accept`
+          belong to the pipeline, so asking for files above this was
+          asking people to choose their data before they had said what
+          they were doing -- and labelling the pickers for whichever
+          pipeline happened to be selected by default. */}
+      <PipelineChooser
+        pipelines={PIPELINES}
+        value={pipeline.id}
+        onChange={choosePipeline}
+        busy={busy}
+      />
 
       <fieldset>
         <legend>Input files</legend>
@@ -239,24 +259,6 @@ export function App() {
 
       <fieldset>
         <legend>Settings</legend>
-        <label>
-          <span>Pipeline</span>
-          <select
-            value={pipelineId}
-            onChange={(e) => choosePipeline(e.target.value)}
-            disabled={busy}
-            data-testid="pipeline"
-          >
-            {PIPELINES.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <p className="meta" data-testid="pipeline-summary">
-          {pipeline.summary}
-        </p>
         {/* Whatever this pipeline asks for. The shell does not know
             what these mean; it hands them back on submit. */}
         <pipeline.Controls options={options} onChange={setOptions} busy={busy} />

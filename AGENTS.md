@@ -74,6 +74,22 @@ What follows from that:
 
 **Do not set site policy in the submit file.** The server applies this access point's own defaults and overrides — a required log location, an accounting group, a concurrency limit — to everything this app submits. Writing them here is at best redundant and at worst fights the operator.
 
+## The interface
+
+Five things a real site asked for, after running these apps on an access point and on a phone.
+
+**Ask what to run before asking for files.** A slot's label, its hint and its `accept` all belong to the pipeline, so a form that takes the files first is labelling its pickers for whichever pipeline happened to be selected by default. `components/PipelineChooser` is the first block on the page and the pickers come after it.
+
+**One pipeline gets no picker.** A drop-down with a single entry is a control that cannot do anything, and an app built from this template by deleting the examples it does not want has exactly one. That space goes to the pipeline's own `description` instead -- what it does, what to bring, what comes back, what a run costs -- which is what a first-time user of a single-purpose app has nothing else on the page to tell them. The description is rendered whether or not there is a picker; it is the explanation, not a consolation prize.
+
+**`GET /jobs` has no order, and the list polls every five seconds.** Rendering it in arrival order means rows swapping places under the user's cursor -- which is what the site reported. `lib/jobs.ts` sorts it, newest run first, and `api.jobs` applies that so no caller can forget. The comparator is a TOTAL order: ties left on `QDate` alone are resolved by the input order, which is the arbitrary thing being removed.
+
+**A result table is a list of cards on a phone.** Six columns at 390 pixels either scroll sideways, hiding the columns people came for, or squeeze every cell to two characters. The table gets `phone-cards`, each `<td>` gets `data-label`, and `styles.css` does the rest in a media query. Do NOT measure the viewport in JavaScript: a layout that depends on a measured width is wrong for the first paint and in a thumbnail, and the browser already knows the width. The label is what makes a card readable -- without it the cards are a column of unlabelled numbers -- so a cell with no `data-label` is a cell with no meaning. A table whose headings are sort buttons adds `phone-sort`, which keeps those buttons when the rest of the header goes.
+
+**Name a container image when the job needs a library.** The astro pipeline needs astropy; it used to hope the execute node had it and, when it did not, told the user to ask an administrator. `container_image = docker://...` is one line, and `pipelines/astro/submit.ts` says what to check before changing it. Pin the tag, pull it and run it -- a wrong image name holds every job with a transfer error that mentions neither the image nor the library.
+
+**`plan()` may be async.** A pipeline that generates its job's inputs FROM the user's data -- per-job submit files built from the rows of an uploaded CSV -- has to read that data, and reading a `File` in a browser is a promise. The shell awaits `plan`, so a synchronous planner is unaffected. `assertSync` in `pipelines/types.ts` is how a synchronous pipeline's tests stay synchronous.
+
 ## Platform constraints
 
 These are properties of the server, not preferences. Violating one produces a page that works in `make dev` and breaks when deployed.

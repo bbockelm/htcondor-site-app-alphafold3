@@ -16,6 +16,7 @@
 // think in the particular way you are about to assume.
 
 import { redirectToLogin, type Identity } from './htcondor';
+import { sortJobs } from './jobs';
 
 const BASE = '/api/v1';
 
@@ -194,11 +195,17 @@ export const api = {
    * Add an attribute here before you read it anywhere else.
    *
    * `limit` also has a default (50) and truncates silently.
+   *
+   * SORTED HERE, newest run first. The route promises no order and
+   * does not have a stable one, so a list rendered in arrival order
+   * reshuffles itself every time the app polls -- which it does every
+   * five seconds, under the user's cursor. Sorting at the edge means
+   * no caller can forget; lib/jobs.ts says what the order is.
    */
   jobs: (constraint?: string, attrs: readonly string[] = JOB_ATTRS, limit = 200) => {
     const q = new URLSearchParams({ projection: attrs.join(','), limit: String(limit) });
     if (constraint) q.set('constraint', constraint);
-    return request<{ jobs: Job[] }>(`/jobs?${q}`).then((r) => r.jobs ?? []);
+    return request<{ jobs: Job[] }>(`/jobs?${q}`).then((r) => sortJobs(r.jobs ?? []));
   },
 
   job: (jobId: string) => request<Job>(`/jobs/${encodeURIComponent(jobId)}`),

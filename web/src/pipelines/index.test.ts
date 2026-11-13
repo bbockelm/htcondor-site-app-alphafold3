@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { PIPELINES, ownJobsConstraint, pipelineForJob } from './index';
-import { isPlanError } from './types';
+import { assertSync, isPlanError, type Pipeline, type PlanResult } from './types';
 
 /**
  * The batch name a pipeline actually produces, taken from a real plan
@@ -105,4 +105,42 @@ describe('every pipeline is wired up', () => {
       expect(isPlanError(planned) ? planned.message : '').toBe('');
     },
   );
+});
+
+describe('a planner may be asynchronous', () => {
+  // Generating a job's inputs FROM the user's data -- per-job submit
+  // files built from the rows of an uploaded CSV, say -- means reading
+  // that data, and reading a File in a browser is a promise. The shell
+  // awaits plan() for exactly that; this pins the interface that makes
+  // it possible, because a sync-only signature compiles fine until the
+  // first app needs it.
+  const asyncPipeline: Pipeline<Record<string, never>> = {
+    id: 'later',
+    name: 'Later',
+    summary: 'plans after reading something',
+    batchPrefix: 'later-',
+    inputs: [{ id: 'input', label: 'Files', hint: 'anything', multiple: false }],
+    defaults: {},
+    Controls: () => null as never,
+    plan: async (): Promise<PlanResult> => ({
+      kind: 'job',
+      batchName: 'later-1',
+      submitFile: 'queue 1\n',
+      uploads: [],
+    }),
+    Results: () => null as never,
+  };
+
+  it('is awaited, not rendered as a pending promise', async () => {
+    const planned = await asyncPipeline.plan({ input: [] }, {});
+    expect(isPlanError(planned)).toBe(false);
+    expect(planned.kind).toBe('job');
+  });
+
+  it('is still fine for the synchronous planners that ship here', () => {
+    for (const p of PIPELINES) {
+      const ex = p.example!;
+      expect(() => assertSync(p.plan(ex.build(), { ...p.defaults, ...ex.options }))).not.toThrow();
+    }
+  });
 });
