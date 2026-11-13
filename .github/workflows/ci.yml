@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Two stages, deliberately different in what they cost.
+#
+#   check  — lint, typecheck, unit tests, build, bundle. No services,
+#            under a minute, and it uploads the bundle so every green
+#            commit has a downloadable artifact.
+#   e2e    — the real htcondor-api in demo mode, driven through a
+#            browser. Minutes, and only worth starting if `check`
+#            passed: an app that does not compile cannot fail an
+#            end-to-end test in an informative way.
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: make check
+      - run: make bundle
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundle
+          path: |
+            dist/*.zip
+            dist/*.zip.sha256
+          if-no-files-found: error
+
+  e2e:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: make install
+      - run: npx --prefix web playwright install --with-deps chromium
+      - run: make e2e
+        env:
+          # `devel`, not `latest`: this repository is developed in step
+          # with the server, so its CI tests against the server's main
+          # branch and catches a regression on the day it lands.
+          #
+          # `latest` is the newest RELEASE, which is what `make e2e`
+          # uses by default and what a site actually runs. The two
+          # differ for as long as it takes a fix to be released, and a
+          # spec that needs an unreleased one fails here with no hint
+          # that the server is the reason.
+          #
+          # In a lab repository, pin a release tag instead. Tracking
+          # somebody else's main branch means their merge breaks your
+          # CI.
+          API_IMAGE: ghcr.io/bbockelm/golang-htcondor:devel
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          # web/, not the root: the Playwright config lives beside
+          # web/node_modules so it can resolve @playwright/test, and
+          # the report and traces land next to the config. Uploading
+          # the root path captured nothing, which is how a failing run
+          # came with no screenshot to look at.
+          path: |
+            web/playwright-report/
+            web/test-results/
+          retention-days: 7

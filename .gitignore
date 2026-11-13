@@ -1,0 +1,13 @@
+node_modules/
+web/dist/
+dist/
+test-results/
+playwright-report/
+web/test-results/
+web/playwright-report/
+# Written by scripts/e2e.sh: the demo server's generated passwords,
+# copied out of the container so the suite can log in. Throwaway, but
+# they are credentials and they do not belong in a commit.
+.e2e/
+*.local
+.DS_Store

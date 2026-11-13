@@ -1,0 +1,9 @@
+# What this app is. The site decides who may see it, in the access
+# point's own configuration -- see README.md.
+#
+# There is deliberately no `groups` key here and no `id`. Groups are the
+# operator's to set; the id comes from the bundle's file name, or from
+# the form when the bundle is uploaded through the admin page.
+name: Example Pipeline
+description: Pick a pipeline, add files or use the example data, and read the results here.
+icon: beaker

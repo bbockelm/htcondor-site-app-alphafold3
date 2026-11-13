@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Example Pipeline</title>
+    <!--
+      No <base> tag here. The access point injects one, along with
+      window.__HTCONDOR_APP__ and the shell bar, when it serves this
+      file. Adding one would override it and pin the app to one mount
+      point.
+
+      No external stylesheets or fonts either: the server sends
+      Content-Security-Policy: default-src 'self', so anything loaded
+      from a CDN is blocked. Vendor what you need into src/.
+    -->
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

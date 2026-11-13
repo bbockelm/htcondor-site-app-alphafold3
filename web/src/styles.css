@@ -1,0 +1,135 @@
+/* Vendored, not loaded from a CDN: the access point sends
+   Content-Security-Policy: default-src 'self', which blocks external
+   stylesheets and fonts. */
+
+:root {
+  --bg: #ffffff;
+  --fg: #1a1d21;
+  --muted: #5c6670;
+  --line: #d9dee3;
+  --accent: #1f6feb;
+  --accent-fg: #ffffff;
+  --ok: #1a7f37;
+  --warn: #9a6700;
+  --err: #b42318;
+  --radius: 8px;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15181c;
+    --fg: #e6e9ec;
+    --muted: #9aa4af;
+    --line: #2b3137;
+    --accent: #4d8ef7;
+    --ok: #3fb950;
+    --warn: #d29922;
+    --err: #f85149;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.5;
+}
+
+/* The access point may inject a shell bar above the page. It sets this
+   variable so content can sit clear of it. */
+main {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: calc(1.5rem + var(--htcondor-shell-height, 0px)) 1rem 4rem;
+}
+
+h1 { font-size: 1.5rem; margin: 0 0 .25rem; }
+h2 { font-size: 1rem; margin: 2rem 0 .75rem; }
+p.lede { color: var(--muted); margin: 0 0 2rem; }
+
+fieldset { border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem; margin: 0 0 1rem; }
+legend { padding: 0 .4rem; color: var(--muted); font-size: .85rem; }
+label { display: block; margin-bottom: .75rem; }
+label span { display: block; font-size: .85rem; color: var(--muted); margin-bottom: .2rem; }
+
+select, input[type='number'] {
+  width: 100%; padding: .5rem; font: inherit;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--bg); color: var(--fg);
+}
+
+button {
+  font: inherit; padding: .55rem 1.1rem; border-radius: var(--radius);
+  border: 1px solid var(--accent); background: var(--accent); color: var(--accent-fg);
+  cursor: pointer;
+}
+button:disabled { opacity: .5; cursor: not-allowed; }
+button.secondary { background: transparent; color: var(--fg); border-color: var(--line); }
+
+.dropzone {
+  border: 2px dashed var(--line); border-radius: var(--radius);
+  padding: 2rem 1rem; text-align: center; color: var(--muted);
+  cursor: pointer; transition: border-color .15s, background .15s;
+}
+.dropzone.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.dropzone input { display: none; }
+
+ul.files, ul.jobs { list-style: none; padding: 0; margin: .75rem 0 0; }
+ul.files li, ul.jobs li {
+  display: flex; align-items: center; gap: .75rem;
+  padding: .5rem .25rem; border-bottom: 1px solid var(--line);
+}
+ul.files li span.name, ul.jobs li span.name { flex: 1; overflow-wrap: anywhere; }
+.size, .meta { color: var(--muted); font-size: .85rem; }
+
+.status-ok { color: var(--ok); }
+.status-warn { color: var(--warn); }
+.status-err { color: var(--err); }
+
+.notice { padding: .75rem 1rem; border-radius: var(--radius); border: 1px solid var(--line); margin-bottom: 1rem; }
+.notice.error { border-color: var(--err); color: var(--err); }
+.notice.success { border-color: var(--ok); color: var(--ok); }
+
+/* One labelled place to put files. A pipeline with a single slot looks
+   exactly as it did before; one with several gets a heading each. */
+.slot + .slot { margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
+.slot h3 { font-size: .95rem; margin: 0 0 .15rem; }
+.slot p.meta { margin: 0 0 .6rem; }
+
+label.checkbox { display: flex; align-items: center; gap: .5rem; }
+label.checkbox input { width: auto; margin: 0; }
+label.checkbox span { display: inline; margin: 0; }
+
+textarea {
+  width: 100%; padding: .5rem; font: inherit; font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: .85rem; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--bg); color: var(--fg); resize: vertical;
+}
+
+/* A job row, and the results panel that opens under it. The row is the
+   flex line; the panel has to sit outside it or it is squeezed into a
+   column. */
+ul.jobs li { display: block; }
+ul.jobs li .job { display: flex; align-items: center; gap: .75rem; }
+
+.results { margin: .75rem 0 .25rem; }
+.results table { border-collapse: collapse; width: 100%; font-size: .85rem; }
+.results th, .results td { text-align: left; padding: .35rem .5rem; border-bottom: 1px solid var(--line); }
+.results th { color: var(--muted); font-weight: 600; }
+.results td.num, .results th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.results th .sort { background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; }
+.results .bar {
+  display: inline-block; height: .55rem; margin-right: .4rem; vertical-align: baseline;
+  background: color-mix(in srgb, var(--accent) 45%, transparent); border-radius: 2px;
+}
+.results pre.report {
+  white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem;
+  background: color-mix(in srgb, var(--fg) 5%, transparent);
+  padding: .75rem; border-radius: var(--radius);
+}
+.results img { max-width: 100%; height: auto; border-radius: var(--radius); }
+.results .error { color: var(--err); }
