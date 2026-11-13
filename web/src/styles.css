@@ -133,3 +133,124 @@ ul.jobs li .job { display: flex; align-items: center; gap: .75rem; }
 }
 .results img { max-width: 100%; height: auto; border-radius: var(--radius); }
 .results .error { color: var(--err); }
+
+/* The pipeline, its summary and its inline documentation. This block
+   is the first thing on the page: what you are running has to be
+   settled before the pickers below it mean anything.
+
+   An app with ONE pipeline draws no selector -- see
+   components/PipelineChooser -- and this is what fills that space. */
+.summary { margin: 0; }
+dl.about { margin: .75rem 0 0; font-size: .9rem; }
+dl.about dt { color: var(--muted); font-size: .8rem; margin-top: .6rem; }
+dl.about dd { margin: .1rem 0 0; }
+
+/* RESULT TABLES BECOME CARDS ON A PHONE.
+   ---------------------------------------------------------------
+   A six-column table at 390 CSS pixels is unreadable: it either
+   scrolls sideways, which hides the columns people came for, or it
+   squeezes every cell to two characters. A site reported exactly
+   this.
+
+   It is done in CSS, with a media query, and NOT by measuring the
+   viewport in JavaScript. A layout that depends on a measured width
+   is wrong for the first paint, wrong in a thumbnail, and wrong
+   whenever the page is rendered somewhere that is not a live browser
+   window. The browser already knows the width; ask it in the
+   stylesheet.
+
+   The column meaning travels with each value. `content: attr(
+   data-label)` puts the heading in front of the cell, which is why
+   every <td> in a results view carries data-label -- the headings
+   themselves are gone at this width, so without it a card is a column
+   of unlabelled numbers. A cell with no data-label simply renders
+   nothing before it.
+
+   Sorting survives: a table whose headings are buttons adds
+   `phone-sort`, and those buttons stay as a row above the cards
+   rather than disappearing with the rest of the header. */
+@media (max-width: 36rem) {
+  .results table.phone-cards,
+  .results table.phone-cards tbody,
+  .results table.phone-cards tr,
+  .results table.phone-cards td {
+    display: block;
+    width: 100%;
+  }
+
+  .results table.phone-cards thead { display: none; }
+
+  .results table.phone-cards tr {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: .4rem .6rem;
+    margin-bottom: .5rem;
+  }
+
+  .results table.phone-cards td {
+    padding: .15rem 0;
+    border-bottom: 0;
+  }
+  /* Right-aligned numbers are a column device. In a card the value
+     sits against its own label and has nothing to line up with. */
+  .results table.phone-cards td.num { text-align: left; }
+
+  /* Label on the left, value on the right -- but only for a cell that
+     HAS a label. A table whose rows are already labelled by a row
+     header (astro's statistics) puts the value plainly under it
+     instead of against an empty gutter. */
+  .results table.phone-cards td[data-label] {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .results table.phone-cards td[data-label]::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: .8rem;
+    flex: 0 0 auto;
+  }
+
+  /* A row header inside the body is the card's own heading. */
+  .results table.phone-cards tbody th {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: .15rem 0;
+    border-bottom: 0;
+  }
+
+  /* The sortable headings, kept above the cards. */
+  .results table.phone-cards.phone-sort thead { display: block; }
+  .results table.phone-cards.phone-sort thead tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: .75rem;
+    border: 0;
+    border-radius: 0;
+    padding: 0 0 .5rem;
+    margin: 0;
+  }
+  .results table.phone-cards.phone-sort thead tr::before {
+    content: 'Sort by';
+    color: var(--muted);
+    font-size: .8rem;
+  }
+  .results table.phone-cards.phone-sort thead th { display: none; }
+  .results table.phone-cards.phone-sort thead th.sortable {
+    display: block;
+    padding: 0;
+    border-bottom: 0;
+    text-align: left;
+  }
+
+  /* A job row is a flex line of name, state and up to three controls.
+     At this width the name takes the whole first line and the state
+     and buttons sit under it. Without this the name is squeezed into
+     whatever the buttons leave over -- about three characters, broken
+     mid-word, because it is the only flexible item in the row. */
+  ul.jobs li .job { flex-wrap: wrap; }
+  ul.jobs li .job span.name { flex: 1 0 100%; }
+}

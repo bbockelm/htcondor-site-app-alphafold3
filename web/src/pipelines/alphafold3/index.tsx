@@ -315,6 +315,27 @@ export const alphafold3: Pipeline<AlphaFold3Options> = {
   name: 'AlphaFold3 structure prediction',
   summary:
     'Alignments on CPUs, then structures on GPUs — one workflow per batch of sequences. The model weights stay where you staged them.',
+  // The app has one pipeline, so no selector is drawn and this is what
+  // stands in its place. It is the only thing a first-time user reads
+  // before deciding what to upload, so it has to answer the questions
+  // they actually have -- above all that the weights are theirs to
+  // supply and that a run without them is still useful.
+  description: {
+    what:
+      'Predicts the three-dimensional structure of each protein, nucleic acid and ligand complex you list. ' +
+      'Each one becomes two jobs: a search for related sequences on ordinary CPUs, then the structure itself on a GPU.',
+    needs:
+      'A CSV manifest — one row per structure, naming it and its molecules — or a single sequence pasted into the box. ' +
+      'For the structure stage you also give the location, on this access point, of your own AlphaFold3 model weights: ' +
+      'they are licensed from Google DeepMind and cannot be distributed with this app. Leave that empty and the ' +
+      'alignments still run, which is a useful result on its own and the slow half of the work.',
+    gives:
+      'Per structure: the predicted models, and the confidence scores to judge them by — the ranking score, pTM, and ' +
+      'ipTM where there is more than one chain. The alignments come back too, so a later run can reuse them.',
+    cost:
+      'The alignment stage is the long one: tens of minutes to hours per sequence against a large reference database. ' +
+      'The structure stage is minutes on one GPU, sized by how long the sequence is.',
+  },
   batchPrefix: BATCH_PREFIX,
   inputs: [
     {

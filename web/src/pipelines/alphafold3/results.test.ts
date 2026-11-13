@@ -7,6 +7,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { collectRows, stateOf } from './Results';
+import resultsSource from './Results.tsx?raw';
 import { dataStatusFile, inferenceStatusFile } from './af3';
 
 function entry(name: string, body: unknown) {
@@ -93,5 +94,20 @@ describe('gathering the nodes’ reports', () => {
 
   it('is empty when the workflow reported nothing at all', () => {
     expect(collectRows([entry('alphafold3.dag.dagman.out', 'nothing ran')])).toEqual([]);
+  });
+});
+
+describe('on a phone', () => {
+  it('labels every cell, so a card is readable without its header row', () => {
+    // Under 36rem the table becomes a list of cards and the header row
+    // is gone. A cell with no data-label renders as a bare value --
+    // and five of these six are numbers, which say nothing on their
+    // own. See the phone-cards rules in styles.css.
+    const src = resultsSource;
+    expect(src).toContain('className="table phone-cards"');
+    const cells = src.match(/<td[ >]/g) ?? [];
+    const labelled = src.match(/<td[^>]*data-label="/g) ?? [];
+    expect(cells.length).toBeGreaterThan(0);
+    expect(labelled.length).toBe(cells.length);
   });
 });

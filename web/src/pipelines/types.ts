@@ -112,6 +112,23 @@ export function isPlanError(r: PlanResult): r is PlanError {
 }
 
 /**
+ * A planner's answer, when that planner is a synchronous one.
+ *
+ * `Pipeline.plan` may return a promise, so its type is a union and a
+ * caller has to deal with both. A pipeline that plans synchronously --
+ * all three here -- has tests that would otherwise become async for no
+ * reason at all. This narrows the union and says out loud which kind
+ * of planner is under test, throwing if that ever changes rather than
+ * quietly asserting against a pending promise.
+ */
+export function assertSync(r: PlanResult | Promise<PlanResult>): PlanResult {
+  if (r instanceof Promise) {
+    throw new Error('this planner answered with a promise; await it instead');
+  }
+  return r;
+}
+
+/**
  * Data to run with when the user has none of their own.
  *
  * Every pipeline here ships one, and the shell offers it as a checkbox
@@ -150,6 +167,30 @@ export interface ResultsProps {
 }
 
 /**
+ * The inline documentation shown above the pickers.
+ *
+ * A one-line `summary` is enough to tell three pipelines apart in a
+ * drop-down. It is not enough to open an app that does exactly one
+ * thing: there is no picker there, and a first-time user arrives at a
+ * form with no idea what it wants or what it will give back. So a
+ * pipeline says that here, in the user's own terms, and the shell
+ * renders it in the space a one-entry picker would have wasted.
+ *
+ * Keep each field to a sentence or three. This is the only place the
+ * app explains itself, and nobody reads a wall of text above a form.
+ */
+export interface PipelineDescription {
+  /** What this computes, and why somebody would want it. */
+  what: string;
+  /** What the user has to bring. Name the file kinds they will have. */
+  needs: string;
+  /** What comes back, and what they can do with it afterwards. */
+  gives: string;
+  /** What a run costs: how long, how much uploaded, how many jobs. */
+  cost?: string;
+}
+
+/**
  * A pipeline. `O` is whatever that pipeline keeps in its own options;
  * the shell holds it without looking inside.
  */
@@ -158,6 +199,12 @@ export interface Pipeline<O = unknown> {
   name: string;
   /** One line, shown under the picker. */
   summary: string;
+  /**
+   * The longer version, shown above the pickers whether or not there
+   * is a picker. An app with ONE pipeline renders no selector at all,
+   * and this is what stands in its place.
+   */
+  description?: PipelineDescription;
   /**
    * What every batch name from this pipeline starts with.
    *

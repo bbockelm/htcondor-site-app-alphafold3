@@ -40,6 +40,31 @@ test('the app is served under its own id and knows where it is', async ({ page }
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 });
 
+test('what to run is explained before which files to run it on', async ({ page }) => {
+  await page.goto(APP_URL);
+
+  // This app has ONE pipeline, so it draws no selector at all -- a
+  // dropdown with a single entry is a control that cannot be used.
+  // What stands in that space is the pipeline explaining itself, and
+  // it has to come before the pickers: a slot's label, its hint and
+  // its `accept` all belong to the pipeline, so a form that asks for
+  // files first is labelling its pickers for something the user has
+  // not been told about yet.
+  await expect(page.getByTestId('pipeline')).toHaveCount(0);
+  await expect(page.getByTestId('pipeline-about')).toContainText('What you need');
+
+  // Asserted on DOM order rather than coordinates: that is what the
+  // reading order actually is, and it does not depend on the window.
+  const explainedFirst = await page.evaluate(() => {
+    const about = document.querySelector('[data-testid="pipeline-about"]');
+    const picker = document.querySelector('input[type="file"]');
+    if (!about || !picker) return null;
+    // DOCUMENT_POSITION_FOLLOWING: the picker comes after the text.
+    return Boolean(about.compareDocumentPosition(picker) & Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+  expect(explainedFirst).toBe(true);
+});
+
 test('a manifest of sequences reaches the real queue as a workflow', async ({ page }) => {
   await page.goto(APP_URL);
 
@@ -172,4 +197,42 @@ test('a workflow that cannot run says why, per job, on the results page', async 
   await expect(results.getByTestId('af3-job-problem').first()).toContainText(
     'AlphaFold3 is not available',
   );
+});
+
+test('the submit outcome lands on screen, where the button was pressed', async ({ page }) => {
+  // The notice used to be rendered at the top of the page. On a
+  // filled-in form that is a screenful or more above the button, so
+  // pressing Run looked like it had done nothing at all.
+  //
+  // No earlier test could catch that, and every one of them passed
+  // while it was happening: toBeVisible() asks whether an element is
+  // RENDERED, not whether it is on screen, and an element scrolled a
+  // thousand pixels above the window satisfies it. toBeInViewport is
+  // the assertion that matches the complaint.
+  await page.setViewportSize({ width: 390, height: 844 }); // a phone
+  await page.goto(APP_URL);
+
+  await page.getByTestId('use-example').check();
+
+  const button = page.getByTestId('submit');
+  // Pressed at the BOTTOM EDGE of the window, which is where a button
+  // at the end of a form is when you have just scrolled down to it --
+  // and the case where putting the notice next to the button is not
+  // enough on its own, because next-to-it is just off the bottom.
+  await button.evaluate((el) => el.scrollIntoView({ block: 'end' }));
+  await button.click();
+
+  const notice = page.getByTestId('submitted');
+  await expect(notice).toBeVisible();
+  // ratio: 1, not the default. The default passes on ANY intersection,
+  // and measuring it showed this test going green on six visible
+  // pixels of a fifty-pixel notice -- a sliver nobody can read, which
+  // is the complaint it is supposed to be catching.
+  await expect(notice).toBeInViewport({ ratio: 1 });
+
+  // And the button is STILL on screen next to it. Without this, a page
+  // that answered by scrolling back to a notice at the top would pass:
+  // the notice would be in the viewport and the control the person was
+  // using would have been thrown a screenful away.
+  await expect(button).toBeInViewport({ ratio: 1 });
 });
