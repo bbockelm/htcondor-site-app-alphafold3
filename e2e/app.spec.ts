@@ -198,3 +198,41 @@ test('a workflow that cannot run says why, per job, on the results page', async 
     'AlphaFold3 is not available',
   );
 });
+
+test('the submit outcome lands on screen, where the button was pressed', async ({ page }) => {
+  // The notice used to be rendered at the top of the page. On a
+  // filled-in form that is a screenful or more above the button, so
+  // pressing Run looked like it had done nothing at all.
+  //
+  // No earlier test could catch that, and every one of them passed
+  // while it was happening: toBeVisible() asks whether an element is
+  // RENDERED, not whether it is on screen, and an element scrolled a
+  // thousand pixels above the window satisfies it. toBeInViewport is
+  // the assertion that matches the complaint.
+  await page.setViewportSize({ width: 390, height: 844 }); // a phone
+  await page.goto(APP_URL);
+
+  await page.getByTestId('use-example').check();
+
+  const button = page.getByTestId('submit');
+  // Pressed at the BOTTOM EDGE of the window, which is where a button
+  // at the end of a form is when you have just scrolled down to it --
+  // and the case where putting the notice next to the button is not
+  // enough on its own, because next-to-it is just off the bottom.
+  await button.evaluate((el) => el.scrollIntoView({ block: 'end' }));
+  await button.click();
+
+  const notice = page.getByTestId('submitted');
+  await expect(notice).toBeVisible();
+  // ratio: 1, not the default. The default passes on ANY intersection,
+  // and measuring it showed this test going green on six visible
+  // pixels of a fifty-pixel notice -- a sliver nobody can read, which
+  // is the complaint it is supposed to be catching.
+  await expect(notice).toBeInViewport({ ratio: 1 });
+
+  // And the button is STILL on screen next to it. Without this, a page
+  // that answered by scrolling back to a notice at the top would pass:
+  // the notice would be in the viewport and the control the person was
+  // using would have been thrown a screenful away.
+  await expect(button).toBeInViewport({ ratio: 1 });
+});

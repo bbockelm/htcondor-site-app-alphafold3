@@ -19,7 +19,7 @@
 //                pipeline.Results under the job and leaves the
 //                download link for the people who want the files.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, HoldReasonCode, JobStatus, jobStatusLabel, type Job } from './lib/api';
 import { PIPELINES, ownJobsConstraint, pipelineById, pipelineForJob } from './pipelines';
 import { emptyFileSet, isPlanError, type FileSet } from './pipelines/types';
@@ -45,6 +45,16 @@ export function App() {
   const [submitted, setSubmitted] = useState<string | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [open, setOpen] = useState<string | null>(null);
+  const noticeRef = useRef<HTMLDivElement>(null);
+
+  // Adjacency is not enough on its own: a button at the bottom edge of
+  // the window leaves the notice just under it off-screen. 'nearest'
+  // scrolls only when it has to, and only as far as it has to.
+  useEffect(() => {
+    if (error || submitted) {
+      noticeRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [error, submitted]);
 
   useEffect(() => {
     api.me().then(setMe).catch(() => setMe({ authenticated: false }));
@@ -167,17 +177,6 @@ export function App() {
         {me?.authenticated ? `Signed in as ${me.username}.` : 'Loading…'}
       </p>
 
-      {error && (
-        <div className="notice error" role="alert" data-testid="error">
-          {error}
-        </div>
-      )}
-      {submitted && (
-        <div className="notice success" role="status" data-testid="submitted">
-          Submitted job {submitted}. It will appear below.
-        </div>
-      )}
-
       {/* WHAT TO RUN COMES FIRST. Each slot's label, hint and `accept`
           belong to the pipeline, so asking for files above this was
           asking people to choose their data before they had said what
@@ -264,6 +263,25 @@ export function App() {
       <button type="button" onClick={() => void run()} disabled={busy} data-testid="submit">
         {busy ? 'Submitting…' : 'Run pipeline'}
       </button>
+
+      {/* THE ANSWER GOES WHERE THE QUESTION WAS ASKED. These used to
+          sit at the top of the page, which on a filled-in form is a
+          screen or more above the button -- so submitting a job looked
+          like it had done nothing at all. Below the button rather than
+          above it: appearing above would push the button out from
+          under the cursor. */}
+      <div ref={noticeRef}>
+        {error && (
+          <div className="notice error" role="alert" data-testid="error">
+            {error}
+          </div>
+        )}
+        {submitted && (
+          <div className="notice success" role="status" data-testid="submitted">
+            Submitted job {submitted}. It will appear below.
+          </div>
+        )}
+      </div>
 
       <h2>Your runs</h2>
       {jobs.length === 0 ? (
