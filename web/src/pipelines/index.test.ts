@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { PIPELINES, ownJobsConstraint, pipelineForJob } from './index';
-import { assertSync, isPlanError, type Pipeline, type PlanResult } from './types';
+import { isPlanError, type Pipeline, type PlanResult } from './types';
 
 /**
  * The batch name a pipeline actually produces, taken from a real plan
@@ -137,10 +137,18 @@ describe('a planner may be asynchronous', () => {
     expect(planned.kind).toBe('job');
   });
 
-  it('is still fine for the synchronous planners that ship here', () => {
+  it('is what the planner that ships here actually is', async () => {
+    // Inherited from the template, where all three planners were
+    // synchronous and this asserted that assertSync accepted them.
+    // This app is the case the async signature was added FOR: its
+    // planner reads the user's CSV to build a submit file per job, so
+    // it returns a promise and the sync assertion is simply the wrong
+    // question here.
     for (const p of PIPELINES) {
       const ex = p.example!;
-      expect(() => assertSync(p.plan(ex.build(), { ...p.defaults, ...ex.options }))).not.toThrow();
+      const answer = p.plan(ex.build(), { ...p.defaults, ...ex.options });
+      expect(answer).toBeInstanceOf(Promise);
+      expect(isPlanError(await answer)).toBe(false);
     }
   });
 });

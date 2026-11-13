@@ -110,13 +110,10 @@ export function App() {
       // The pipeline decides what to submit. It may refuse -- a file
       // it cannot use, a name it cannot safely transfer -- and its
       // message is written for the person who dropped the file.
-<<<<<<< HEAD
-=======
       //
       // AWAITED: a planner that generates the job's inputs from the
       // user's data has to read that data, and reading a File is a
       // promise. A synchronous planner is unaffected.
->>>>>>> f125d64 (Take the template's field-feedback fixes: form order, one-pipeline picker, phone tables, job order)
       const planned = await pipeline.plan(chosen, options);
       if (isPlanError(planned)) {
         setError(planned.message);

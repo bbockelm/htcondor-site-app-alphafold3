@@ -186,7 +186,7 @@ export function Results({ job }: { job: Job }) {
           </p>
         ))}
 
-      <table className="table" data-testid="af3-table">
+      <table className="table phone-cards" data-testid="af3-table">
         <thead>
           <tr>
             <th scope="col">Job</th>
@@ -208,12 +208,12 @@ export function Results({ job }: { job: Job }) {
             const state = stateOf(r);
             return (
               <tr key={r.tag}>
-                <td>{r.tag}</td>
-                <td>{state.label}</td>
-                <td className="num">{score(r.inference?.ranking_score)}</td>
-                <td className="num">{score(r.inference?.ptm)}</td>
-                <td className="num">{score(r.inference?.iptm)}</td>
-                <td>
+                <td data-label="Job">{r.tag}</td>
+                <td data-label="State">{state.label}</td>
+                <td className="num" data-label="Ranking">{score(r.inference?.ranking_score)}</td>
+                <td className="num" data-label="pTM">{score(r.inference?.ptm)}</td>
+                <td className="num" data-label="ipTM">{score(r.inference?.iptm)}</td>
+                <td data-label="Files">
                   {r.inference?.status === 'ok' && (
                     <a href={api.fileUrl(id, inferenceTarball(r.tag))}>structure</a>
                   )}
