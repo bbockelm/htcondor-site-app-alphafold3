@@ -11,11 +11,13 @@ API ?= https://localhost:8443
 # HTCondor and the published API image carries only the Go binary --
 # see the header of scripts/e2e.sh.
 #
-# `latest` is the newest RELEASE of the API server, which is what a
-# site runs. (This repository's own CI overrides it with `devel`, the
-# server's main branch, because the two are developed together.) Pin a
-# release tag in your own repo.
-API_IMAGE ?= ghcr.io/bbockelm/golang-htcondor:latest
+# `devel`, not `latest`, and that is not laziness. This app submits
+# nothing but DAGs, and a demo pool cannot run ANY workflow until the
+# server passes CONDOR_CONFIG down to the DAGMan job and stops DAGMan
+# refusing a node log under /tmp. Both landed on the server's main
+# branch; against the newest RELEASE every workflow aborts in its first
+# second. Pin a release tag here once one carries that fix.
+API_IMAGE ?= ghcr.io/bbockelm/golang-htcondor:devel
 POOL_IMAGE ?= htcondor/mini:latest
 # Where demo mode writes its generated passwords, inside the container.
 DEMO_CREDS ?= /tmp/htcondor-demo-credentials.json
@@ -76,8 +78,12 @@ bundle: build ## Package dist/$(APP).zip and dist/$(APP).zip.sha256
 	@echo "  Then the operator names the groups that may see it, once, in the"
 	@echo "  access point's configuration: HTTP_API_SITE_APP_$(shell printf '%s' "$(APP)" | tr 'a-z-' 'A-Z_')_GROUPS"
 
+# The variables above have to be EXPORTED, not just set: make does not
+# put its own variables in a recipe's environment, and scripts/e2e.sh
+# has defaults of its own -- so a pin written here was silently ignored
+# and the suite ran against whatever the script preferred.
 e2e: install bundle ## Playwright against a demo API server in Docker
-	./scripts/e2e.sh
+	API_IMAGE="$(API_IMAGE)" POOL_IMAGE="$(POOL_IMAGE)" DEMO_CREDS="$(DEMO_CREDS)" ./scripts/e2e.sh
 
 # The committed openapi.json is what AGENTS.md tells you to consult
 # instead of guessing at endpoints. It is a copy, so it can rot; this

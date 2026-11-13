@@ -25,7 +25,12 @@ APP="${APP:-$(basename "$PWD")}"
 # DAGMan's refusal to keep a node log under /tmp. Both landed in the
 # server together; against an image older than that, the workflow
 # aborts in its first second and only that one spec fails.
-API_IMAGE="${API_IMAGE:-ghcr.io/bbockelm/golang-htcondor:latest}"
+# devel, not latest: this app submits nothing but DAGs, and a demo pool
+# cannot run one until the server passes CONDOR_CONFIG down to the
+# DAGMan job and stops DAGMan treating a node log under /tmp as a fatal
+# error. Against the newest release every workflow aborts in its first
+# second, and only the workflow spec fails -- which reads like the app.
+API_IMAGE="${API_IMAGE:-ghcr.io/bbockelm/golang-htcondor:devel}"
 POOL_IMAGE="${POOL_IMAGE:-htcondor/mini:latest}"
 # The SAME port inside the container and out, which is not fussiness.
 # Logging in is a real OAuth round trip and the server builds the IdP's
