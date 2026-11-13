@@ -1,0 +1,21 @@
+{
+  "name": "big_tetramer",
+  "sequences": [
+    {
+      "protein": {
+        "id": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ],
+        "sequence": "MCDDDVAALVVDNGSGMCKAGFAGDDAPRAVFPSIVGRPRHQGVMVGMGQKDSYVGDEAQSKRGILTLKYPIEHGIITNWDDMEKIWHHTFYNELRVAPEEHPVLLTEAPLNPKANREKMTQIMFETFNSPAMYVAIQAVLSLYASGRTTGIVLDSGDGVSHTVPIYEGYALPHAILRLDLAGRDLTDYLMKMCD"
+      }
+    }
+  ],
+  "modelSeeds": [
+    1
+  ],
+  "dialect": "alphafold3",
+  "version": 3
+}

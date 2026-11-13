@@ -109,7 +109,7 @@ export function App() {
       // The pipeline decides what to submit. It may refuse -- a file
       // it cannot use, a name it cannot safely transfer -- and its
       // message is written for the person who dropped the file.
-      const planned = pipeline.plan(chosen, options);
+      const planned = await pipeline.plan(chosen, options);
       if (isPlanError(planned)) {
         setError(planned.message);
         return;

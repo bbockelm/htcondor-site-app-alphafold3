@@ -1,0 +1,7 @@
+Job1_solo_protein,7
+Job2_protein_rna,7
+Job3_tetramer,7
+Job4_with_smiles,7
+Job5_with_ccd,7
+Job6_big_protein,14
+Job7_big_tetramer,10

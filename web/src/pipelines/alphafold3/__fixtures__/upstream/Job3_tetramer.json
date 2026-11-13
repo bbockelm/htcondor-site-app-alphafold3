@@ -1,0 +1,21 @@
+{
+  "name": "tetramer",
+  "sequences": [
+    {
+      "protein": {
+        "id": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ],
+        "sequence": "MCDDDVAALVVDNGSGMCK"
+      }
+    }
+  ],
+  "modelSeeds": [
+    1
+  ],
+  "dialect": "alphafold3",
+  "version": 3
+}

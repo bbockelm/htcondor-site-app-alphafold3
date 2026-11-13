@@ -1,0 +1,22 @@
+{
+  "name": "protein_rna",
+  "sequences": [
+    {
+      "protein": {
+        "id": "A",
+        "sequence": "MQIFVKTLTG"
+      }
+    },
+    {
+      "rna": {
+        "id": "B",
+        "sequence": "GUCUUCAAAACUAGGUCG"
+      }
+    }
+  ],
+  "modelSeeds": [
+    1
+  ],
+  "dialect": "alphafold3",
+  "version": 3
+}

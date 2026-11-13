@@ -7,13 +7,9 @@ Read this before writing code. Most of what follows is not guessable from the so
 **How to use this file.** The rules below are mostly scar tissue — each one is a mistake somebody already made, with the reason it was not obvious. When you hit a problem this file does not name, the shape of an answer is usually one of:
 
 - **Ask the server before you guess.** Read `openapi.json` at the repo root *first*, before `api.ts` — the client here is a convenience wrapper over a much larger API, and the routes it does not wrap are the ones you will need. More than one app has shipped a worse design because its author never looked.
-- **Go and read the pipelines.** Three worked examples live in `web/src/pipelines/`, behind the picker in the running app:
+- **Go and read the pipeline.** There is one, `web/src/pipelines/alphafold3/`, and the template's three worked examples (`wordfreq`, `astro`, `blast`) have been deleted — which is what the template says to do. Their lessons are quoted where they apply; to see them in full, read the template repository.
 
-  - `wordfreq` — start here. One file in, one job, a sortable table from the job's `results.json`, and an awk program generated in the browser so no user text reaches the submit file.
-  - `astro` — binary results. A rendered PNG comes back and the page shows it by URL rather than reading its bytes.
-  - `blast` — **the DAG trick**: one large shared input, uploaded once instead of once per job.
-
-  `web/src/pipelines/types.ts` is the whole interface, and it is short. Read it before designing anything.
+  `web/src/pipelines/types.ts` is the whole interface, and it is short. Read it before designing anything. One thing in it differs from the template: `plan` may return a promise, because this pipeline generates the job's program FROM the user's file and reading a File in a browser is async.
 
 If you solve something this file does not cover, add it here. The next person is in your position with less time.
 
@@ -64,11 +60,11 @@ What follows from that:
 
   Two constraints that shape the design: the spool is **one flat directory**, so every file is referenced by basename and two inputs cannot share a name; and **nothing can be added after submission**, so everything the workflow will ever need goes up in that one upload.
 
-  **`POST /api/v1/jobs/dag` submits one**, and it takes everything in a single multipart request: the `.dag`, the node submit files, and the shared input together. That is not a convenience — a workflow's spool is written once, and a file missing from the manager job's `transfer_input_files` is *skipped* at spool time rather than rejected, so a submit-then-upload shape would be accepted and silently drop your database. `api.submitDag` in `web/src/lib/api.ts` does this; `web/src/pipelines/blast` is a worked example.
+  **`POST /api/v1/jobs/dag` submits one**, and it takes everything in a single multipart request: the `.dag`, the node submit files, and the shared input together. That is not a convenience — a workflow's spool is written once, and a file missing from the manager job's `transfer_input_files` is *skipped* at spool time rather than rejected, so a submit-then-upload shape would be accepted and silently drop your database. `api.submitDag` in `web/src/lib/api.ts` does this; `web/src/pipelines/alphafold3` is what uses it here.
 
 - **Getting a DAG's results back is its own problem, and two tidy-looking answers do not work.** Every node runs in the *same* directory, so a node writing a fixed `results.json` overwrites its neighbours: silently, with no error and no hold, visible only as a results page missing most of the search. Give each node its own output names — and have the job *write* them. `transfer_output_remaps` looks like the right tool and is a trap: it is honoured when the submit file goes through `condor_submit` and **ignored when DAGMan submits the same file itself**, which is what DAGMan does by default. The attribute lands on the job ad either way, so there is nothing to see.
 
-  Then the page has to find those names again after a reload, when it has a job id and nothing else. Spooling a manifest alongside the workflow does not work either: `GET /api/v1/jobs/{id}/output` returns what the job **produced**, and a file uploaded as an input is not in it — the request answers 404 and a perfectly good search reports as unreadable. Read the output sandbox instead and pick the results out by name. It is one request, it contains only outputs (so it stays small however large the shared input was), and a node that never ran is simply absent. `web/src/lib/tar.ts` and `web/src/pipelines/blast/Results.tsx` do this.
+  Then the page has to find those names again after a reload, when it has a job id and nothing else. Spooling a manifest alongside the workflow does not work either: `GET /api/v1/jobs/{id}/output` returns what the job **produced**, and a file uploaded as an input is not in it — the request answers 404 and a perfectly good search reports as unreadable. Read the output sandbox instead and pick the results out by name. It is one request, it contains only outputs (so it stays small however large the shared input was), and a node that never ran is simply absent. `web/src/lib/tar.ts` and `web/src/pipelines/alphafold3/Results.tsx` do this.
 
 - **`RETRY` the failures worth retrying, and excuse the ones that are not.** An evicted job deserves another go; "this pool has no BLAST+ installed" returns the same answer however many times it is asked. `RETRY node 2 UNLESS-EXIT <code>` is the difference between a twenty-second answer and a several-minute one, with the user watching the whole wait. That means the runner needs a distinct exit code for "this node cannot do the job at all", and the DAG and the runner have to agree on it.
 
@@ -119,6 +115,7 @@ Makefile              make help
 web/src/lib/htcondor.ts   where am I, who is looking (platform integration)
 web/src/lib/api.ts        typed API client — extend this, don't bypass it
 web/src/pipelines/        THIS is your science: one directory per pipeline
+web/src/pipelines/alphafold3/site.ts   what this access point provides
 web/src/lib/submit.ts     escaping, naming, sizing — shared by all of them
 web/src/app.tsx           the shell: identity, pickers, submit, job list, results
 e2e/                      playwright against a real server
@@ -126,3 +123,19 @@ scripts/e2e.sh            starts the server, deploys the bundle, runs the suite
 ```
 
 `web/src/pipelines/<name>/` is what is actually about this lab's work; `web/src/lib/submit.ts` is the shared half every pipeline builds on, and a mistake there is a security bug rather than a job that does not start. The quoting helpers in it are not decoration: `$` in a submit file is a macro substitution, and `$ENV(...)` reads the *server's* environment, so a file name a user typed must be escaped before it goes anywhere near a submit command.
+
+## AlphaFold3 in particular
+
+Everything above is the platform. These are this app's own, and each one is a thing that fails quietly:
+
+- **`site.ts` is the only place site policy belongs**, and its shipped preset is `NONE` — a configuration that cannot work, on purpose. A container no execute point can fetch does not fail, it HOLDS; a requirement no machine satisfies does not fail, it sits IDLE; and a web page cannot tell a user either of those things. `NONE` submits, runs, and says "this machine has no AlphaFold3" in a sentence. Do not make a plausible-looking default out of values nobody has checked against a live pool.
+
+- **The alignment tarball's name is load-bearing.** The wrapper writes `data_pipeline.tar.gz`; the inference wrapper looks for `*.data_pipeline.tar.gz`, which that name does not match — the star cannot eat the dot. Both tutorials bridge it with `transfer_output_remaps`, which is honoured by `condor_submit` and **ignored when DAGMan submits the node itself**. The runner renames the file instead. If you ever "simplify" that away, the structure stage reports "no input" after waiting for a GPU.
+
+- **`on_exit_hold = (ExitCode != 0)` is in both tutorials and must not be copied here.** Under DAGMan a held node is not a failed node: nothing retries it, nothing reports it, and the workflow waits for ever.
+
+- **The wrapper moves every `*.json` beside it into AlphaFold3's input directory.** The runners give it a directory of its own for that reason. Run in the job's own sandbox it would sweep up the status file the results page depends on.
+
+- **The model weights are licensed from Google DeepMind and must never be committed, bundled, or offered as example data.** The form takes a LOCATION, never a file. That works because DAGMan submits the node jobs on the access point itself, so `transfer_input_files` can name a path on its disk — which an ordinary job submitted through this API cannot do, because the API server shares no filesystem with the schedd.
+
+- **`fold_input.json` is checked against the tutorial's own script**, whose output is committed under `__fixtures__/upstream/`. Those files are the oracle; do not regenerate them to make a test pass. AlphaFold3 reads this file, so a difference there is a difference in the science and none of it fails loudly.

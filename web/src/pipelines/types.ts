@@ -176,8 +176,16 @@ export interface Pipeline<O = unknown> {
   /** Something to run when the user has no data of their own. */
   example?: Example<O>;
   Controls: (p: ControlsProps<O>) => JSX.Element;
-  /** Turn the chosen files and options into a submission. */
-  plan: (files: FileSet, options: O) => PlanResult;
+  /**
+   * Turn the chosen files and options into a submission.
+   *
+   * May be async, and in this app it is. A pipeline that generates the
+   * job's program from the user's data -- rather than shipping a
+   * program that reads it at run time -- has to READ that data, and
+   * reading a File in a browser is a promise. The shell awaits this,
+   * so a synchronous planner still works unchanged.
+   */
+  plan: (files: FileSet, options: O) => PlanResult | Promise<PlanResult>;
   /** Read this pipeline's output. Rendered under a finished job. */
   Results: (p: ResultsProps) => JSX.Element;
 }

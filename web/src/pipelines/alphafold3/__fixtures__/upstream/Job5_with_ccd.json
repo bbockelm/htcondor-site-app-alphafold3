@@ -1,0 +1,35 @@
+{
+  "name": "with_ccd",
+  "sequences": [
+    {
+      "protein": {
+        "id": "A",
+        "sequence": "MQIFVKTLTG"
+      }
+    },
+    {
+      "ligand": {
+        "id": [
+          "G",
+          "H",
+          "I"
+        ],
+        "ccdCodes": [
+          "ATP",
+          "ADP"
+        ]
+      }
+    },
+    {
+      "dna": {
+        "id": "Z",
+        "sequence": "ACGTACGT"
+      }
+    }
+  ],
+  "modelSeeds": [
+    1
+  ],
+  "dialect": "alphafold3",
+  "version": 3
+}

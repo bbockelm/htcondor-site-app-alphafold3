@@ -4,6 +4,6 @@
 # There is deliberately no `groups` key here and no `id`. Groups are the
 # operator's to set; the id comes from the bundle's file name, or from
 # the form when the bundle is uploaded through the admin page.
-name: Example Pipeline
-description: Pick a pipeline, add files or use the example data, and read the results here.
+name: AlphaFold3
+description: Predict structures from sequences — alignments on CPUs, then structures on GPUs, as one workflow.
 icon: beaker

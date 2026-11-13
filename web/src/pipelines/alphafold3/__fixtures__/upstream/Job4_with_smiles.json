@@ -1,0 +1,22 @@
+{
+  "name": "with_smiles",
+  "sequences": [
+    {
+      "protein": {
+        "id": "A",
+        "sequence": "MQIFVKTLTG"
+      }
+    },
+    {
+      "ligand": {
+        "id": "K",
+        "smiles": "CC(=O)OC1C[NH+]2CCC1CC2"
+      }
+    }
+  ],
+  "modelSeeds": [
+    1
+  ],
+  "dialect": "alphafold3",
+  "version": 3
+}
