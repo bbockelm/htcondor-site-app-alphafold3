@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { sortJobs, dagProgress } from './jobs';
-import { api, JOB_ATTRS, type Job } from './api';
+import { sortJobs, dagProgress, ageOf, isActive } from './jobs';
+import { api, JobStatus, JOB_ATTRS, type Job } from './api';
 
 /**
  * A queue in a deliberately wrong order.
@@ -128,5 +128,58 @@ describe('what a workflow row says about itself', () => {
     for (const a of ['DAG_NodesTotal', 'DAG_NodesDone', 'DAG_NodesFailed']) {
       expect(JOB_ATTRS as readonly string[]).toContain(a);
     }
+  });
+});
+
+describe('how old a run is', () => {
+  const now = Date.parse('2026-11-13T12:00:00Z');
+  const at = (iso: string): Job => ({
+    ClusterId: 1,
+    ProcId: 0,
+    JobStatus: 2,
+    QDate: Math.floor(Date.parse(iso) / 1000),
+  });
+
+  it('reads QDate as SECONDS, which is what the schedd stores', () => {
+    // Treating it as milliseconds dates every job to January 1970 and
+    // every row reads "20331d ago" -- which is the kind of wrong that
+    // looks like a backend problem.
+    expect(ageOf(at('2026-11-13T11:30:00Z'), now)).toBe('30m ago');
+  });
+
+  it('says it in the words the console uses', () => {
+    expect(ageOf(at('2026-11-13T11:59:57Z'), now)).toBe('just now');
+    expect(ageOf(at('2026-11-13T11:59:15Z'), now)).toBe('45s ago');
+    expect(ageOf(at('2026-11-13T09:00:00Z'), now)).toBe('3h ago');
+    expect(ageOf(at('2026-11-11T12:00:00Z'), now)).toBe('2d ago');
+  });
+
+  it('never counts backwards when a clock disagrees', () => {
+    // The schedd's clock and the browser's are two clocks. A job
+    // queued "in the future" is a skew, not a negative age.
+    expect(ageOf(at('2026-11-13T12:00:30Z'), now)).toBe('just now');
+  });
+
+  it('says nothing at all when there is no QDate', () => {
+    expect(ageOf({ ClusterId: 1, ProcId: 0, JobStatus: 2 }, now)).toBe('');
+    expect(ageOf({ ClusterId: 1, ProcId: 0, JobStatus: 2, QDate: 0 }, now)).toBe('');
+  });
+});
+
+describe('which jobs are still doing something', () => {
+  const withStatus = (s: number): Job => ({ ClusterId: 1, ProcId: 0, JobStatus: s });
+
+  it('counts transferring as busy, because its output is still moving', () => {
+    // Removing a job mid-transfer throws away the results it is in the
+    // middle of bringing back.
+    expect(isActive(withStatus(JobStatus.Transferring))).toBe(true);
+    expect(isActive(withStatus(JobStatus.Idle))).toBe(true);
+    expect(isActive(withStatus(JobStatus.Running))).toBe(true);
+  });
+
+  it('counts finished, held and removed as done', () => {
+    expect(isActive(withStatus(JobStatus.Completed))).toBe(false);
+    expect(isActive(withStatus(JobStatus.Held))).toBe(false);
+    expect(isActive(withStatus(JobStatus.Removed))).toBe(false);
   });
 });

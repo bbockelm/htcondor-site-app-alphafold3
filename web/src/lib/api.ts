@@ -251,6 +251,26 @@ export const api = {
     request<void>(`/jobs/${encodeURIComponent(jobId)}/release`, { method: 'POST' }),
 
   /**
+   * Take a job out of the queue for good.
+   *
+   * This is `condor_rm`: the job is removed, its sandbox goes, and
+   * anything not already downloaded is gone with it. A finished run
+   * lingers in the queue until somebody clears it, which is what this
+   * is for -- and why the button offering it is not offered for a job
+   * that is still doing something.
+   *
+   * The route is implemented and has been since before this app
+   * existed. An earlier comment here said it answered 501 and that a
+   * removal button "would be a control that cannot work", which was
+   * read out of the committed openapi.json -- a COPY, which says
+   * "NOT YET IMPLEMENTED" and has rotted. `make openapi` refreshes it
+   * from a running server; the server is the only authority on what
+   * its routes do.
+   */
+  remove: (jobId: string) =>
+    request<void>(`/jobs/${encodeURIComponent(jobId)}`, { method: 'DELETE' }),
+
+  /**
    * Submit a DAG workflow, with everything it needs, in ONE request.
    *
    * Not submit-then-upload like a plain job, and this is not a style

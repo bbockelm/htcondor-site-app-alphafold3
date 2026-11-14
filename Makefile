@@ -26,6 +26,14 @@ API_PORT ?= 8443
 # Where demo mode writes its generated passwords, inside the container.
 DEMO_CREDS ?= /tmp/htcondor-demo-credentials.json
 
+# Build labels recorded in the bundle's app.yaml. Empty by default, so
+# an ordinary `make bundle` is unchanged; the release workflow sets
+# them from the tag and the commit. Nothing in the access point reads
+# them -- they are what makes "which build was running in October?"
+# answerable from the audit trail.
+VERSION ?=
+REVISION ?=
+
 NPM := npm --prefix web
 
 .DEFAULT_GOAL := help
@@ -69,6 +77,7 @@ bundle: build ## Package dist/$(APP).zip and dist/$(APP).zip.sha256
 	rm -rf dist/stage dist/$(APP).zip dist/$(APP).zip.sha256
 	mkdir -p dist/stage/web
 	cp app.yaml dist/stage/
+	python3 scripts/stamp-manifest.py dist/stage/app.yaml "$(VERSION)" "$(REVISION)"
 	cp -R web/dist/. dist/stage/web/
 	find dist/stage -exec touch -t 198001010000 {} +
 	cd dist/stage && zip -qrX ../$(APP).zip .

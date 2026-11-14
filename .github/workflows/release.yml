@@ -1,0 +1,82 @@
+# Attach the deployable bundle to a GitHub release.
+#
+# Installing a common app should be: open the release page, download
+# two files, copy them to the access point. Without this, every site
+# that wants this app has to clone it, install node, and build -- for
+# an artifact that is byte-for-byte the same wherever it is built.
+#
+# THE ASSET'S FILE NAME IS THE APP'S ID. A bundle called
+# `myapp.zip` is served at /site/myapp/, so the asset is uploaded
+# under exactly the name `make bundle` produced and is NOT decorated
+# with the version. `myapp-1.2.0.zip` would deploy as an app called
+# `myapp-1.2.0`, beside the `myapp` it was meant to replace -- and the
+# version is recorded inside the bundle anyway, where the access point
+# can show it.
+name: Release
+
+on:
+  release:
+    types: [published]
+  # So a maintainer can rebuild and re-upload without cutting another
+  # release -- a failed upload, or a release whose notes were written
+  # before the assets were wanted.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The existing release tag to build and upload to
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The tag, not the default branch: a release is a build of
+          # what was tagged, and `workflow_dispatch` can name an older
+          # one.
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # Everything CI runs before e2e. A release is not the place to
+      # find out the app does not compile, and the bundle is about to
+      # be handed to sites that will not build it themselves.
+      - run: make check
+
+      - name: Build the bundle
+        env:
+          TAG: ${{ github.event.inputs.tag || github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          # v1.2.0 -> 1.2.0. The leading v is a tag convention, not
+          # part of the version.
+          make bundle VERSION="${TAG#v}" REVISION="$(git rev-parse --short HEAD)"
+
+      - name: Attach it to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag || github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          # --clobber so a re-run replaces the assets rather than
+          # failing on "already exists" and leaving the older build
+          # attached to the newer release.
+          gh release upload "$TAG" dist/*.zip dist/*.zip.sha256 --clobber
+
+      # The same files, kept with the run. A release can be deleted or
+      # edited; this is what says what was actually built.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundle
+          path: |
+            dist/*.zip
+            dist/*.zip.sha256
+          if-no-files-found: error
