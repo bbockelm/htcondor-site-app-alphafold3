@@ -43,15 +43,33 @@ export function pipelineForJob(batchName: unknown): AnyPipeline | undefined {
 }
 
 /**
- * A queue constraint matching every job this app submitted.
+ * A queue constraint matching every job THIS PAGE submitted.
  *
- * `substr` rather than `regexp`: the prefix contains a dash, which is
+ * `substr` rather than `regexp`: the prefixes contain a dash, which is
  * harmless in a regex, but the next person to add a pipeline will use
  * a dot or a plus and find that it silently matches more than they
  * meant. A prefix comparison cannot do that.
+ *
+ * And `DAGManJobId is undefined`, which is what keeps a workflow to
+ * ONE row. DAGMan passes its own -batch-name down to the node jobs it
+ * submits, so a DAG's nodes carry the same JobBatchName as the manager
+ * whether or not the node submit file sets one -- measured, not
+ * assumed:
+ *
+ *   Cluster | JobBatchName    | DAGManJobId | Universe
+ *   2       | blastdemo-probe | undefined   | 7  (scheduler: the manager)
+ *   3       | blastdemo-probe | 2           | 5  (vanilla: a node)
+ *   4       | blastdemo-probe | 2           | 5
+ *
+ * Without the clause a two-query BLAST search appears three times over
+ * and looks like it was submitted repeatedly. The nodes are not this
+ * page's jobs: the page submitted the workflow, DAGMan submitted the
+ * nodes, and what they are doing belongs under the run that owns them
+ * -- which is where blast's Results view reads it from.
  */
 export function ownJobsConstraint(): string {
-  return PIPELINES.map(
+  const mine = PIPELINES.map(
     (p) => `substr(JobBatchName, 0, ${p.batchPrefix.length}) == "${p.batchPrefix}"`,
   ).join(' || ');
+  return `(${mine}) && DAGManJobId is undefined`;
 }

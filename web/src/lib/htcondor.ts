@@ -56,3 +56,24 @@ export function redirectToLogin(): void {
   const returnTo = window.location.pathname + window.location.search;
   window.location.href = `/login?return_to=${encodeURIComponent(returnTo)}`;
 }
+
+/**
+ * Whether the access point put its own navigation on this page.
+ *
+ * A current server injects `<script src="/site/_shell.js">` into every
+ * site app's <head>, and that script draws the bar carrying the way
+ * back to the console and the switcher between apps. A server from
+ * before that was added injects nothing, and an app served by one is a
+ * room with no door: it fills the window, and the only way out is to
+ * edit the address bar.
+ *
+ * So the app offers its own way back when, and only when, the server
+ * did not. Checked on the SCRIPT TAG rather than on the bar itself,
+ * which is the difference between a question with an answer and a
+ * race: the tag is in the HTML the server sent, while the bar appears
+ * later, after the script has loaded and asked who is looking.
+ */
+export function siteProvidesNavigation(): boolean {
+  if (typeof document === 'undefined') return false;
+  return document.querySelector('script[src="/site/_shell.js"]') !== null;
+}

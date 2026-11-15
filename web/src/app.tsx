@@ -21,9 +21,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, HoldReasonCode, JobStatus, jobStatusLabel, type Job } from './lib/api';
+import { ageOf, dagProgress, isActive } from './lib/jobs';
 import { PIPELINES, ownJobsConstraint, pipelineById, pipelineForJob } from './pipelines';
 import { emptyFileSet, isPlanError, type FileSet } from './pipelines/types';
-import { app, type Identity } from './lib/htcondor';
+import { app, siteProvidesNavigation, type Identity } from './lib/htcondor';
 import { Dropzone } from './components/Dropzone';
 import { PipelineChooser } from './components/PipelineChooser';
 import { formatSize } from './lib/format';
@@ -45,6 +46,17 @@ export function App() {
   const [submitted, setSubmitted] = useState<string | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [open, setOpen] = useState<string | null>(null);
+  // Jobs this page has just removed. The schedd takes a moment to
+  // reap a removed job, so without this the row stays put and
+  // changes its status to "Cancelled" -- which reads as the button
+  // having failed. They are dropped from the list rather than from
+  // the queue state, so if a removal does NOT take, the row comes
+  // back on the next poll instead of being hidden forever.
+  const [removed, setRemoved] = useState<string[]>([]);
+  // One clock for every age on the page, so a list of twenty runs
+  // does not hold twenty timers -- and so they all say "3m ago" at
+  // the same moment rather than drifting apart by render order.
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const noticeRef = useRef<HTMLDivElement>(null);
 
   // Adjacency is not enough on its own: a button at the bottom edge of
@@ -64,7 +76,15 @@ export function App() {
   // database to drift out of sync with it.
   const refresh = useCallback(async () => {
     try {
-      setJobs(await api.jobs(ownJobsConstraint()));
+      const queued = await api.jobs(ownJobsConstraint());
+      setJobs(queued);
+      // Anything we removed that is genuinely gone no longer needs
+      // hiding; keeping the list short keeps this honest when a
+      // cluster id is reused.
+      setRemoved((r) =>
+        r.filter((id) => queued.some((j) => `${j.ClusterId}.${j.ProcId}` === id)),
+      );
+
     } catch (e) {
       if (!(e instanceof ApiError && e.status === 401)) {
         setError(e instanceof Error ? e.message : String(e));
@@ -78,7 +98,31 @@ export function App() {
     return () => clearInterval(t);
   }, [refresh]);
 
+  // The ages tick on their own, because a page left open on a running
+  // job would otherwise keep saying "just now" for as long as nothing
+  // else changed.
+  useEffect(() => {
+    const t = setInterval(() => setNowMs(Date.now()), 15_000);
+    return () => clearInterval(t);
+  }, []);
+
+  /** Take a finished run out of the queue, and out of the list. */
+  async function clear(id: string) {
+    setError(null);
+    try {
+      await api.remove(id);
+      setRemoved((r) => (r.includes(id) ? r : [...r, id]));
+      if (open === id) setOpen(null);
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   const pipeline = pipelineById(pipelineId) ?? PIPELINES[0];
+  // What the list draws: the queue, less the rows this page has just
+  // asked the schedd to remove.
+  const shown = jobs.filter((j) => !removed.includes(`${j.ClusterId}.${j.ProcId}`));
   const usingExample = example !== null;
   const chosen = usingExample ? example : files;
 
@@ -175,6 +219,18 @@ export function App() {
       <h1>{app.name}</h1>
       <p className="lede">
         {me?.authenticated ? `Signed in as ${me.username}.` : 'Loading…'}
+        {/* A way out, when the access point did not provide one. A
+            current server draws a bar across the top of every site app
+            with this link in it; an older one draws nothing, and then
+            this app is a page with no exit but the address bar. */}
+        {!siteProvidesNavigation() && (
+          <>
+            {' '}
+            <a href="/" data-testid="back-to-console">
+              Back to the HTCondor console
+            </a>
+          </>
+        )}
       </p>
 
       {/* WHAT TO RUN COMES FIRST. Each slot's label, hint and `accept`
@@ -284,66 +340,106 @@ export function App() {
       </div>
 
       <h2>Your runs</h2>
-      {jobs.length === 0 ? (
+      {shown.length === 0 ? (
         <p className="meta">Nothing running yet.</p>
       ) : (
         <ul className="jobs" data-testid="job-list">
-          {jobs.map((j) => {
+          {shown.map((j) => {
             const id = `${j.ClusterId}.${j.ProcId}`;
             const source = pipelineForJob(j.JobBatchName);
             const finished = j.JobStatus === JobStatus.Completed;
             const showing = open === id;
+            const progress = dagProgress(j);
             return (
               <li key={id}>
-                <div className="job">
-                  <span className="name">
-                    {String(j.JobBatchName ?? 'run')} <span className="meta">#{id}</span>
+                {/* ONE disclosure per row, not a control per fact. The
+                    row had grown to a name, an id, a status, a
+                    progress count, a results toggle, a download link
+                    and two buttons, all competing on one line. What a
+                    person scanning the list needs is which run, how it
+                    is going, and how old it is; everything else is a
+                    click away -- the same shape as the console's job
+                    table. */}
+                <button
+                  type="button"
+                  className="row"
+                  aria-expanded={showing}
+                  onClick={() => setOpen(showing ? null : id)}
+                  data-testid={`row-${id}`}
+                >
+                  <span className={`caret${showing ? ' open' : ''}`} aria-hidden="true">
+                    ▶
                   </span>
-                  <span className="meta">{jobStatusLabel(j)}</span>
-                  {finished && source && (
-                    <button
-                      type="button"
-                      className="secondary"
-                      aria-expanded={showing}
-                      onClick={() => setOpen(showing ? null : id)}
-                      data-testid={`results-toggle-${id}`}
-                    >
-                      {showing ? 'Hide results' : 'Show results'}
-                    </button>
+                  <span className="name">{String(j.JobBatchName ?? 'run')}</span>
+                  <span className="status">{jobStatusLabel(j)}</span>
+                  {/* A workflow is one row, so the row carries its
+                      progress. Null for an ordinary job. */}
+                  {progress && (
+                    <span className="meta" data-testid={`progress-${id}`}>
+                      {progress}
+                    </span>
                   )}
-                  {finished && (
-                    // Still here, and still worth having: the page
-                    // renders what the result MEANS, and some people
-                    // want the bytes.
-                    <a href={api.outputUrl(id)}>Download files</a>
-                  )}
-                  {(j.JobStatus === JobStatus.Idle || j.JobStatus === JobStatus.Running) && (
-                    // "Stop", not "Cancel": this holds the job, which
-                    // leaves it in the queue where it can be released.
-                    // DELETE /jobs/{id} answers 501, so a Cancel button
-                    // would be a control that cannot work.
-                    <button
-                      type="button"
-                      className="secondary"
-                      onClick={() => void api.hold(id).then(refresh)}
-                    >
-                      Stop
-                    </button>
-                  )}
-                  {j.JobStatus === JobStatus.Held &&
-                    j.HoldReasonCode !== HoldReasonCode.SpoolingInput && (
-                      <button
-                        type="button"
-                        className="secondary"
-                        onClick={() => void api.release(id).then(refresh)}
-                      >
-                        Try again
-                      </button>
+                  <span className="meta age" data-testid={`age-${id}`}>
+                    {ageOf(j, nowMs)}
+                  </span>
+                </button>
+
+                {showing && (
+                  <div className="details" data-testid={`details-${id}`}>
+                    <p className="meta">Job #{id}</p>
+
+                    <div className="actions">
+                      {finished && (
+                        // Still here, and still worth having: the page
+                        // renders what the result MEANS, and some
+                        // people want the bytes.
+                        <a href={api.outputUrl(id)}>Download files</a>
+                      )}
+                      {isActive(j) ? (
+                        // "Stop", not "Cancel": this holds the job,
+                        // which leaves it in the queue where it can be
+                        // released -- and where its output is still
+                        // waiting to come back.
+                        <button
+                          type="button"
+                          className="secondary"
+                          onClick={() => void api.hold(id).then(refresh)}
+                        >
+                          Stop
+                        </button>
+                      ) : (
+                        // Removing is condor_rm: the job goes, and so
+                        // does anything in its sandbox that was not
+                        // downloaded. Offered only once the job has
+                        // stopped doing something, so one click can
+                        // never throw away a run that is still working
+                        // or still bringing its results back.
+                        <button
+                          type="button"
+                          className="secondary"
+                          onClick={() => void clear(id)}
+                          data-testid={`remove-${id}`}
+                        >
+                          Remove
+                        </button>
+                      )}
+                      {j.JobStatus === JobStatus.Held &&
+                        j.HoldReasonCode !== HoldReasonCode.SpoolingInput && (
+                          <button
+                            type="button"
+                            className="secondary"
+                            onClick={() => void api.release(id).then(refresh)}
+                          >
+                            Try again
+                          </button>
+                        )}
+                    </div>
+
+                    {finished && source && (
+                      <div className="results" data-testid={`results-${id}`}>
+                        <source.Results job={j} />
+                      </div>
                     )}
-                </div>
-                {showing && source && (
-                  <div className="results" data-testid={`results-${id}`}>
-                    <source.Results job={j} />
                   </div>
                 )}
               </li>

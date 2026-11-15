@@ -110,11 +110,43 @@ textarea {
   background: var(--bg); color: var(--fg); resize: vertical;
 }
 
-/* A job row, and the results panel that opens under it. The row is the
-   flex line; the panel has to sit outside it or it is squeezed into a
-   column. */
+/* A job row, and the details that open under it.
+   
+   The whole row is the button: a caret alone is a small target, and on
+   a phone it is the difference between opening a run and missing it.
+   It is styled as a line of text rather than as a control, because
+   twenty of them stacked as buttons would read as a wall of chrome. */
 ul.jobs li { display: block; }
-ul.jobs li .job { display: flex; align-items: center; gap: .75rem; }
+ul.jobs li button.row {
+  display: flex; align-items: baseline; gap: .75rem; width: 100%;
+  padding: .15rem 0; background: none; border: 0; color: inherit;
+  font: inherit; text-align: left; cursor: pointer;
+}
+ul.jobs li button.row:hover .name { text-decoration: underline; }
+ul.jobs li button.row .caret {
+  flex: none; width: .9rem; color: var(--muted); font-size: .7rem;
+  transition: transform .12s ease-in-out;
+}
+ul.jobs li button.row .caret.open { transform: rotate(90deg); }
+ul.jobs li button.row .name { flex: 1; overflow-wrap: anywhere; }
+ul.jobs li button.row .status { flex: none; }
+/* Pushed to the end and never wrapped: the age is the one thing in the
+   row that is read by scanning down a column. */
+ul.jobs li button.row .age { flex: none; margin-left: auto; white-space: nowrap; }
+
+.details { padding: .25rem 0 .5rem 1.65rem; }
+.details p.meta { margin: 0 0 .5rem; }
+.details .actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+
+/* At phone width the status and the age keep the row's second line to
+   themselves rather than squeezing the name into a two-character
+   column. */
+@media (max-width: 36rem) {
+  ul.jobs li button.row { flex-wrap: wrap; row-gap: .15rem; }
+  ul.jobs li button.row .name { flex: 1 0 calc(100% - 1.65rem); }
+  ul.jobs li button.row .status { margin-left: 1.65rem; }
+  .details { padding-left: 1.65rem; }
+}
 
 .results { margin: .75rem 0 .25rem; }
 .results table { border-collapse: collapse; width: 100%; font-size: .85rem; }

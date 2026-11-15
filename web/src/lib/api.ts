@@ -81,6 +81,15 @@ export const JOB_ATTRS = [
   // Needed to tell 'spooling your input' (16) apart from a real
   // problem. Without it every just-submitted job reads as failed.
   'HoldReasonCode',
+  // A workflow is ONE row (see ownJobsConstraint), so that row has to
+  // say how much of the workflow is done -- otherwise a DAG with forty
+  // nodes reads exactly like a single job that has been "Running" for
+  // an hour. DAGMan publishes these on the manager job and updates
+  // them as it goes; they are absent on every other kind of job.
+  'DAG_NodesTotal',
+  'DAG_NodesDone',
+  'DAG_NodesQueued',
+  'DAG_NodesFailed',
 ] as const satisfies readonly string[];
 
 /** A job as the API returns it: a ClassAd, so the fields are loose. */
@@ -92,6 +101,11 @@ export interface Job {
   Cmd?: string;
   JobBatchName?: string;
   QDate?: number;
+  // DAGMan's own counters, present only on a workflow's manager job.
+  DAG_NodesTotal?: number;
+  DAG_NodesDone?: number;
+  DAG_NodesQueued?: number;
+  DAG_NodesFailed?: number;
   HoldReason?: string;
   HoldReasonCode?: number;
   ExitCode?: number;
@@ -235,6 +249,26 @@ export const api = {
   /** Release a held job so it can run again. */
   release: (jobId: string) =>
     request<void>(`/jobs/${encodeURIComponent(jobId)}/release`, { method: 'POST' }),
+
+  /**
+   * Take a job out of the queue for good.
+   *
+   * This is `condor_rm`: the job is removed, its sandbox goes, and
+   * anything not already downloaded is gone with it. A finished run
+   * lingers in the queue until somebody clears it, which is what this
+   * is for -- and why the button offering it is not offered for a job
+   * that is still doing something.
+   *
+   * The route is implemented and has been since before this app
+   * existed. An earlier comment here said it answered 501 and that a
+   * removal button "would be a control that cannot work", which was
+   * read out of the committed openapi.json -- a COPY, which says
+   * "NOT YET IMPLEMENTED" and has rotted. `make openapi` refreshes it
+   * from a running server; the server is the only authority on what
+   * its routes do.
+   */
+  remove: (jobId: string) =>
+    request<void>(`/jobs/${encodeURIComponent(jobId)}`, { method: 'DELETE' }),
 
   /**
    * Submit a DAG workflow, with everything it needs, in ONE request.

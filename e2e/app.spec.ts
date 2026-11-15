@@ -173,18 +173,41 @@ test('a workflow that cannot run says why, per job, on the results page', async 
 
   await page.goto(APP_URL);
   await page.getByTestId('use-example').check();
+  // Every row in the list, counted BEFORE this run is submitted.
+  // What follows asserts that this submission adds exactly one of
+  // them -- which is the claim, and which counting rows by batch-name
+  // prefix is not: this suite leaves earlier runs of the same
+  // pipeline in the queue, and they are other people's rows as far as
+  // this test is concerned.
+  const rows = page.getByTestId('job-list').locator('li');
+  const before = await rows.count();
+
   await page.getByTestId('submit').click();
 
   const submitted = page.getByTestId('submitted');
   await expect(submitted).toBeVisible({ timeout: 60_000 });
   const id = (await submitted.innerText()).match(/(\d+\.\d+)/)![1];
 
-  const toggle = page.getByTestId(`results-toggle-${id}`);
-  await expect(toggle).toBeVisible({ timeout: 260_000 });
-  await toggle.click();
-
+  // ONE row for one run, for the whole life of the workflow.
+  //
+  // DAGMan passes its own -batch-name down to the node jobs it
+  // submits, so the nodes carry the manager's JobBatchName and a
+  // constraint written on the name alone returns all of them -- one
+  // run reported several times over, as if it had been submitted
+  // repeatedly. Sampled repeatedly because the nodes exist for only
+  // part of the run; that they existed at all is proven at the end of
+  // this test, by a report only a node could have written.
+  await page.getByTestId(`row-${id}`).click();
   const results = page.getByTestId(`results-${id}`);
-  await expect(results.getByTestId('af3-results')).toBeVisible();
+  const deadline = Date.now() + 260_000;
+  while (Date.now() < deadline) {
+    // One more row than before, never more, at any moment of the run.
+    expect(await rows.count()).toBeLessThanOrEqual(before + 1);
+    if (await results.count()) break;
+    await page.waitForTimeout(500);
+  }
+
+  await expect(results.getByTestId('af3-results')).toBeVisible({ timeout: 10_000 });
   // Two jobs from the example manifest, each found by name in the
   // workflow's shared directory: proof the per-job output names
   // survived a flat spool.
@@ -235,4 +258,101 @@ test('the submit outcome lands on screen, where the button was pressed', async (
   // the notice would be in the viewport and the control the person was
   // using would have been thrown a screenful away.
   await expect(button).toBeInViewport({ ratio: 1 });
+});
+
+test('a finished run can be cleared away, and says how old it is', async ({ page }) => {
+  // Removing is condor_rm against the real schedd. Nothing short of a
+  // real queue can tell you whether the job actually goes: the route
+  // the app calls is DELETE /api/v1/jobs/{id}, which the committed
+  // openapi.json still describes as "NOT YET IMPLEMENTED" — it is a
+  // copy, and it has rotted. This test is what says otherwise.
+  test.setTimeout(240_000);
+
+  await page.goto(APP_URL);
+  await page.getByTestId('use-example').check();
+
+  const rows = page.getByTestId('job-list').locator('li');
+  const before = await rows.count();
+  await page.getByTestId('submit').click();
+
+  const submitted = page.getByTestId('submitted');
+  await expect(submitted).toBeVisible({ timeout: 60_000 });
+  const id = (await submitted.innerText()).match(/(\d+\.\d+)/)![1];
+
+  const row = page.getByTestId(`row-${id}`);
+  // The age is on the row itself, not behind the disclosure: it is one
+  // of the three things worth scanning a list of runs for.
+  await expect(page.getByTestId(`age-${id}`)).toContainText(/just now|\d+[smhd] ago/);
+
+  // Details are hidden until asked for.
+  await expect(page.getByTestId(`details-${id}`)).toHaveCount(0);
+  await row.click();
+  await expect(page.getByTestId(`details-${id}`)).toBeVisible();
+
+  // A job that is still doing something offers Stop, not Remove: one
+  // click must never throw away a run that is still working, or still
+  // bringing its output back.
+  await expect(page.getByTestId(`remove-${id}`)).toHaveCount(0);
+
+  // Once it has finished, it can be cleared.
+  const remove = page.getByTestId(`remove-${id}`);
+  await expect(remove).toBeVisible({ timeout: 200_000 });
+  await remove.click();
+
+  // The row goes at once -- a removed job lingers in the queue for a
+  // moment and would otherwise sit there saying "Cancelled", which
+  // reads as the button having failed.
+  await expect(row).toHaveCount(0);
+  await expect(page.getByTestId('error')).toHaveCount(0);
+
+  // And it is gone from the QUEUE, not just from this page: a fresh
+  // load asks the schedd again.
+  await page.reload();
+  await expect(page.getByTestId(`row-${id}`)).toHaveCount(0, { timeout: 30_000 });
+  await expect(rows).toHaveCount(before, { timeout: 30_000 });
+});
+
+test('the app adds its own way back only when the server has none', async ({ page }) => {
+  // A current access point injects <script src="/site/_shell.js">,
+  // and that script draws a bar with the way back to the console. An
+  // older one injects nothing, and an app served by one is a room
+  // with no door -- which is what a site reported.
+  //
+  // What is asserted here is the APP's half, because it is the only
+  // half that does not depend on which server is running. Whether the
+  // bar then appears, and for whom, has changed between server
+  // releases; this suite runs against whichever image it was pointed
+  // at, so asserting the bar would be asserting the age of that image.
+  await page.goto(APP_URL);
+  const injected = await page.evaluate(
+    () => document.querySelector('script[src="/site/_shell.js"]') !== null,
+  );
+  expect(injected).toBe(true); // this server is a current one
+  // So the app must NOT add a second way back.
+  await expect(page.getByTestId('back-to-console')).toHaveCount(0);
+
+  // Now an access point from before the bar existed. The tag is
+  // stripped as it is parsed, which is what the app sees on such a
+  // server, and the request is blocked so nothing can draw a bar
+  // behind the test's back.
+  await page.route('**/site/_shell.js', (r) => r.abort());
+  await page.addInitScript(() => {
+    const strip = () =>
+      document
+        .querySelectorAll('script[src="/site/_shell.js"]')
+        .forEach((el) => el.remove());
+    strip();
+    // `document`, not `document.documentElement`: an init script runs
+    // before the document has an <html> at all, so observing
+    // documentElement observes null, throws, and the whole init
+    // script is abandoned -- leaving the tag in place and the test
+    // reporting that the app failed to add a link it was right not to
+    // add.
+    new MutationObserver(strip).observe(document, { childList: true, subtree: true });
+  });
+  await page.goto(APP_URL);
+
+  const back = page.getByTestId('back-to-console');
+  await expect(back).toBeVisible();
+  await expect(back).toHaveAttribute('href', '/');
 });
